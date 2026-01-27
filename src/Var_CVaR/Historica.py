@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-def VaR_CVaR_Simulacion_Historica(returns, alpha = 0.01, window = 500, days=10):
+def historica(returns, alpha = 0.01, window = 500, days=10):
 
     var_list = []
     cvar_list = []
@@ -17,17 +17,19 @@ def VaR_CVaR_Simulacion_Historica(returns, alpha = 0.01, window = 500, days=10):
             dates.append(returns.index[t])
             continue
         
-        sample = returns.iloc[t + 1 - window : t + 1].values  # last `window` returns including today
-        sample_sorted = np.sort(sample)                        # ascending: worst returns first
+        # 2. Se construye una base con 500 retornos
+        sample = returns.iloc[t + 1 - window : t + 1].values  
+        
+        # Se ordenan de mas menor a mayor
+        sample_sorted = np.sort(sample) 
 
-        k = int(np.ceil(alpha * window))                       # number of tail observations
-        k = max(k, 1)                                          # safety: at least 1
+        # Numero de observaciones (son 5 para el 99% de 500 retornos)
+        k = int(np.ceil(alpha * window))                       
+        k = max(k, 1)                                          
 
-        # VaR threshold return is the k-th worst return (0-indexed -> k-1)
-        q_alpha = sample_sorted[k - 1]                         # (approximately) alpha-quantile
-
-        VaR = -q_alpha                                         # positive loss number
-        CVaR = -sample_sorted[:k - 1].mean()                       # mean of worst k returns (positive loss)
+        # VaR es la 5a observacion, CVaR es el promedio de las primeras 4
+        VaR = -sample_sorted[k - 1]
+        CVaR = -sample_sorted[:k - 1].mean()
 
         var_list.append(VaR)
         cvar_list.append(CVaR)
@@ -40,20 +42,12 @@ def VaR_CVaR_Simulacion_Historica(returns, alpha = 0.01, window = 500, days=10):
     var_10d_series = pd.Series(var_series * np.sqrt(days), index=dates, name=f"VaR {int((1-alpha)*100)}% {days}d")
     capital_series = pd.Series(3 * var_10d_series, index=dates, name=f"Capital {int((1-alpha)*100)}% {days}d")
 
-    df = returns.copy()
-    df[var_series.name] = var_series
-    df[cvar_series.name] = cvar_series
-    df[var_10d_series.name] = var_10d_series
-    df[capital_series.name] = capital_series
-
     df = pd.DataFrame({
                      "Returns": returns,
                      var_series.name: var_series,
                      cvar_series.name: cvar_series,
                      var_10d_series.name: var_10d_series,
                      capital_series.name: capital_series})
-
-    # drop initial nans
     df = df.dropna()
 
     return df
